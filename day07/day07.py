@@ -2,48 +2,83 @@ import re
 from typing import List
 from dataclasses import dataclass, field
 
-class Node:
-    def size(self):
-        return None
-
-@dataclass
-class File(Node):
-    name: str
-    fsize: int
-    
-    pattern = re.compile(r"(\d+) (.+)")
-    
-    @classmethod
-    def parse(cls, s):
-        m = cls.pattern.match(s)
-        if m:
-            return cls(m.group(2), int(m.group(1)))
-        else:
-            return None
-
-@dataclass
-class Dir(Node):
-    name: str
-    parent: Node = None
-    contents: List[Node] = field(default_factory=list)
-    
-    def add_node(self, s):
+class File:
+    def __init__(self, name, fsize=0):
+        self.name = name
+        self.fsize = fsize
         
+    def __repr__(self):
+        return f"File({self.name} {self.fsize})"
     
-    pattern = re.compile(r"dir (.+)")
-    
-    @classmethod
-    def parse(cls, s):
-        m = cls.pattern.match(s)
-        if m:
-            return cls(m.group(1))
-        else:
-            return None
+    def print_tree(self, indent):
+        print("  "*indent+str(self))
         
+    def totalsize(self):
+        return self.fsize
+        
+class Dir(File):
+    def __init__(self, name, parent=None):
+        self.name = name
+        self.parent = parent
+        self.files = dict()
+
+    def __repr__(self):
+        return f"Dir({self.name})"
+        
+    def add_file(self, file):
+        self.files[file.name] = file
+        if isinstance(file, Dir):
+            file.parent = self
+            
+    def print_tree(self, indent=0):
+        #super().print_tree(indent)
+        print("  "*indent+str(self)+" "+str(self.totalsize()))
+        for name, file in self.files.items():
+            file.print_tree(indent+1)
+            
+    def totalsize(self):
+        return sum(file.totalsize() for name, file in self.files.items())
+    
+    def find_dir_totalsize(self):
+        dirs=[]
+        if self.totalsize() < 100000:
+            dirs.append(self)
+        for name, file in self.files.items():
+            #print(file.name)
+            if isinstance(file, Dir):
+                dirs.extend(file.find_dir_totalsize())
+        return dirs
+        
+def parse_output(filename):
+    root = None
+    with open(filename, "r") as fh:
+        curr = None
+        inls = False
+        for l in fh:
+            c = l.strip().split()
+            if c[0] == "$":
+                if c[1] == "cd":
+                    dirname = c[2]
+                    if dirname == "/":
+                        curr = Dir("/")
+                        root = curr
+                    elif dirname == "..":
+                        curr = curr.parent
+                    else:
+                        curr = curr.files[dirname]
+                elif c[1] == "ls":
+                    pass
+            else:
+                if c[0] == "dir":
+                    curr.add_file(Dir(c[1]))
+                else:
+                    curr.add_file(File(c[1], int(c[0])))
+    return root
+
 if __name__ == '__main__':
-    root = Dir(name="/")
-    print(root)
-    print(File.parse("12321321 foo.txt"))
-    print(Dir.parse("12321321 foo.txt"))
-    print(File.parse("dir foo"))
-    print(Dir.parse("dir foo"))
+    test = parse_output("test.txt")
+    test.print_tree()
+    print(sum([x.totalsize() for x in test.find_dir_totalsize()]))
+    
+    inp = parse_output("input.txt")
+    print(sum([x.totalsize() for x in inp.find_dir_totalsize()]))
