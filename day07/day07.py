@@ -39,14 +39,14 @@ class Dir(File):
     def totalsize(self):
         return sum(file.totalsize() for name, file in self.files.items())
     
-    def find_dir_totalsize(self):
+    def find_dir_totalsize(self, f):
         dirs=[]
-        if self.totalsize() < 100000:
+        if f(self.totalsize()):
             dirs.append(self)
         for name, file in self.files.items():
             #print(file.name)
             if isinstance(file, Dir):
-                dirs.extend(file.find_dir_totalsize())
+                dirs.extend(file.find_dir_totalsize(f))
         return dirs
         
 def parse_output(filename):
@@ -78,7 +78,20 @@ def parse_output(filename):
 if __name__ == '__main__':
     test = parse_output("test.txt")
     test.print_tree()
-    print(sum([x.totalsize() for x in test.find_dir_totalsize()]))
+    le100k = lambda x: x <= 100000
+    print(sum([x.totalsize() for x in test.find_dir_totalsize(le100k)]))
     
     inp = parse_output("input.txt")
-    print(sum([x.totalsize() for x in inp.find_dir_totalsize()]))
+    print(sum([x.totalsize() for x in inp.find_dir_totalsize(le100k)]))
+    
+    currsize = inp.totalsize()
+    print(currsize)
+    totalsize = 70000000
+    free = totalsize - currsize
+    print(free)
+    needed = 30000000 - free
+    print(needed)
+    
+    sizes = sorted([x.totalsize() for x
+                    in inp.find_dir_totalsize(lambda x: x >= needed)])
+    print(sizes[:3])
