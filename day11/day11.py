@@ -1,4 +1,5 @@
 import argparse
+from functools import reduce
 import re
 import sys
 
@@ -73,12 +74,14 @@ if __name__ == "__main__":
         inspectcount.append(0)
     print_inventory(inventory)
     
-    rounds = 20
+    supermod = reduce(lambda x, y: x * y, [m.testi for m in monkeys])
+    print(supermod)
+    rounds = 10000
     for _ in range(rounds):
         for i, m in enumerate(monkeys):
             for item in inventory[i]:
                 inspectcount[i] += 1
-                newitem = m.calcworry(item)
+                newitem = m.calcworry(item) % supermod
                 dest = m.throwto(newitem)
                 inventory[dest].append(newitem)
             inventory[i][:] = []
