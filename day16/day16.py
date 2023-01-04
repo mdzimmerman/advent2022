@@ -28,6 +28,7 @@ class ValveSeq:
         self.vindex = {}
         for v in self.vlist:
             self.vindex[v.name] = v
+        self.effectivevalves = len(list(filter(lambda x: x.flowrate > 0, self.vlist)))
             
     def get(self, name):
         return self.vindex[name]
@@ -39,6 +40,7 @@ class ValveSeq:
         return sum(self.vindex[k].flowrate * (30 - v) for k, v in openvalves.items())
     
     def traverse(self, startvalve, debug=False):
+        nsteps = 1
         startstep = Step(startvalve, 1, {})
         queue = []
         queue.append(startstep)
@@ -47,15 +49,17 @@ class ValveSeq:
         
         maxstep = None
         maxpressure = 0
-        
+            
         while queue:
             s = queue.pop(0)
             if s.minute > 30:
-                return maxpressure, maxstep
+                break
+            nsteps += 1
+            if nsteps % 1000 == 0:
+                print(nsteps)
             pressure = self.totalpressure(s.openvalves)
             if debug:
-                if "DD" in s.openvalves and s.openvalves["DD"] == 2 and "BB" in s.openvalves and s.openvalves["BB"] == 5:
-                    print(f"{pressure:5d} {s} {self.state(s)}")
+                print(f"{pressure:5d} {s}")
             if pressure > maxpressure:
                 maxpressure = pressure
                 maxstep = s
@@ -63,14 +67,16 @@ class ValveSeq:
             if s.valve not in s.openvalves and self.get(s.valve).flowrate > 0:
                 # don't bother opening valves that don't release pressure
                 neighbors.append(Step(s.valve, s.minute+1, {**s.openvalves, s.valve: s.minute}))
-            for nvalve in self.get(s.valve).tunnels:
-                neighbors.append(Step(nvalve, s.minute+1, s.openvalves))
+            if len(s.openvalves) < self.effectivevalves:
+                # only keep going down tunnels if there are still valves to be opened
+                for nvalve in self.get(s.valve).tunnels:
+                    neighbors.append(Step(nvalve, s.minute+1, s.openvalves))
             for ns in neighbors:
                 nstate = self.state(ns)
                 if nstate not in visited:
                     visited.add(nstate)
                     queue.append(ns)
-    
+        print(nsteps)
         return maxpressure, maxstep
     
     @classmethod
@@ -81,18 +87,16 @@ class ValveSeq:
                 out.append(Valve.parse(s.strip()))
         return cls(out)
     
-def main(filename, debug=False):
-    test = ValveSeq.readfile("test.txt")
-    for v in test.vlist:
-        print(v)
-    print()
-    return test.traverse("AA", debug=debug)
-    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('filename')
     parser.add_argument('-d', action='store_true')
-    parser.parse_args()
-    main()
+    args = parser.parse_args()
+    
+    inp = ValveSeq.readfile(args.filename)
+    for v in inp.vlist:
+        print(v)
+    print()
+    print(inp.traverse("AA"), debug=args.d)
     
     
